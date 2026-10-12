@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Catatan Pribadi</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --primary: #0e7c6b;
+      --primary-hover: #129a85;
+      --text: #f8fafc;
+      --text-sub: #94a3b8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
+
+    .app-container { max-width: 500px; margin: 0 auto; }
+    
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 { font-size: 22px; color: #fff; margin-bottom: 6px; }
+    header p { font-size: 13px; color: var(--text-sub); }
+
+    /* FORM INPUT */
+    .note-form {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; margin-bottom: 20px;
+    }
+    .note-form input, .note-form textarea, .search-box input {
+      width: 100%; padding: 12px; background: #0f172a; border: 1px solid var(--border);
+      border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 12px; outline: none;
+    }
+    .note-form textarea { height: 90px; resize: none; }
+    
+    .form-buttons { display: flex; gap: 8px; }
+    .btn-submit {
+      flex: 1; padding: 12px; background: var(--primary); border: none;
+      border-radius: 8px; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer;
+    }
+    .btn-cancel {
+      padding: 12px; background: #334155; border: none;
+      border-radius: 8px; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer; display: none;
+    }
+
+    /* KOLOM PENCARIAN */
+    .search-box {
+      margin-bottom: 16px;
+    }
+    .search-box input {
+      margin-bottom: 0;
+      border-color: var(--primary);
+      background: #111827;
+    }
+
+    .clear-all-btn {
+      background: transparent; border: none; color: var(--text-sub); font-size: 12px;
+      cursor: pointer; text-decoration: underline; margin-bottom: 15px; display: block; margin-left: auto;
+    }
+
+    /* DAFTAR CATATAN */
+    .notes-list { display: flex; flex-direction: column; gap: 14px; }
+    .note-card {
+      background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary);
+      border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; align-items: flex-start;
+      overflow: hidden;
+    }
+    .note-content { flex: 1; min-width: 0; }
+    
+    .note-content h3 {
+      font-size: 15px; color: #fff; margin-bottom: 6px;
+      overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; hyphens: auto;
+    }
+    .note-content p {
+      font-size: 13px; color: var(--text-sub); line-height: 1.5; white-space: pre-wrap;
+      overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; hyphens: auto;
+    }
+    .note-date { font-size: 11px; color: #64748b; margin-top: 10px; }
+
+    .action-btns { display: flex; gap: 6px; margin-left: 12px; flex-shrink: 0; }
+    .btn-edit {
+      background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warning); color: var(--warning);
+      padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    }
+    .btn-delete {
+      background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger);
+      padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    }
+
+    .empty-state { text-align: center; color: var(--text-sub); font-size: 13px; padding: 30px; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <h1>📝 Catatan Harian</h1>
+      <p>Simpan ide, tugas, dan catatan pribadi secara lokal</p>
+    </header>
+
+    <!-- FORM INPUT -->
+    <div class="note-form">
+      <input type="text" id="note-title" placeholder="Judul Catatan..." maxlength="100" autocomplete="off">
+      <textarea id="note-body" placeholder="Tulis isi catatan di sini..."></textarea>
+      
+      <div class="form-buttons">
+        <button id="btn-submit" class="btn-submit" onclick="saveNote()">➕ Tambah Catatan</button>
+        <button id="btn-cancel" class="btn-cancel" onclick="cancelEdit()">Batal</button>
+      </div>
+    </div>
+
+    <!-- KOLOM PENCARIAN -->
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="🔍 Cari catatan berdasarkan judul/isi..." onkeyup="loadNotes()">
+    </div>
+
+    <button class="clear-all-btn" onclick="clearAllData()">🧹 Bersihkan Semua Data Catatan</button>
+
+    <!-- DAFTAR CATATAN -->
+    <div id="notes-container" class="notes-list"></div>
+  </div>
+
+  <script>
+    let editId = null;
+
+    document.addEventListener('DOMContentLoaded', loadNotes);
+
+    function saveNote() {
+      const titleInput = document.getElementById('note-title');
+      const bodyInput = document.getElementById('note-body');
+
+      const title = titleInput.value.trim();
+      const body = bodyInput.value.trim();
+
+      if (!title || !body) {
+        alert('Mohon isi Judul dan Isi Catatan terlebih dahulu!');
+        return;
+      }
+
+      let notes = JSON.parse(localStorage.getItem('my_app_notes') || '[]');
+
+      if (editId !== null) {
+        notes = notes.map(note => {
+          if (note.id === editId) {
+            return {
+              ...note,
+              title: title,
+              body: body,
+              date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' (Di-edit)'
+            };
+          }
+          return note;
+        });
+        editId = null;
+      } else {
+        const newNote = {
+          id: Date.now(),
+          title: title,
+          body: body,
+          date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        };
+        notes.unshift(newNote);
+      }
+
+      localStorage.setItem('my_app_notes', JSON.stringify(notes));
+
+      resetForm();
+      loadNotes();
+    }
+
+    function editNote(id) {
+      let notes = JSON.parse(localStorage.getItem('my_app_notes') || '[]');
+      const noteToEdit = notes.find(note => note.id === id);
+
+      if (noteToEdit) {
+        document.getElementById('note-title').value = noteToEdit.title;
+        document.getElementById('note-body').value = noteToEdit.body;
+        
+        editId = id;
+
+        document.getElementById('btn-submit').innerText = '💾 Simpan Perubahan';
+        document.getElementById('btn-cancel').style.display = 'block';
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function cancelEdit() {
+      editId = null;
+      resetForm();
+    }
+
+    function resetForm() {
+      document.getElementById('note-title').value = '';
+      document.getElementById('note-body').value = '';
+      document.getElementById('btn-submit').innerText = '➕ Tambah Catatan';
+      document.getElementById('btn-cancel').style.display = 'none';
+    }
+
+    function loadNotes() {
+      const container = document.getElementById('notes-container');
+      const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+      
+      let notes = [];
+
+      try {
+        notes = JSON.parse(localStorage.getItem('my_app_notes') || '[]');
+      } catch (e) {
+        notes = [];
+      }
+
+      // FILTER PENCARIAN
+      if (searchQuery !== '') {
+        notes = notes.filter(note => 
+          note.title.toLowerCase().includes(searchQuery) || 
+          note.body.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if (notes.length === 0) {
+        container.innerHTML = `<div class="empty-state">${searchQuery ? 'Catatan tidak ditemukan.' : 'Belum ada catatan. Yuk tulis catatan pertamamu!'}</div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      notes.forEach(note => {
+        const card = document.createElement('div');
+        card.className = 'note-card';
+        card.innerHTML = `
+          <div class="note-content">
+            <h3>${escapeHtml(note.title)}</h3>
+            <p>${escapeHtml(note.body)}</p>
+            <div class="note-date">📅 ${note.date}</div>
+          </div>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editNote(${note.id})">Edit</button>
+            <button class="btn-delete" onclick="deleteNote(${note.id})">Hapus</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function deleteNote(id) {
+      if (confirm('Yakin ingin menghapus catatan ini?')) {
+        let notes = JSON.parse(localStorage.getItem('my_app_notes') || '[]');
+        notes = notes.filter(note => note.id !== id);
+        localStorage.setItem('my_app_notes', JSON.stringify(notes));
+        
+        if (editId === id) cancelEdit();
+        loadNotes();
+      }
+    }
+
+    function clearAllData() {
+      if (confirm('Apakah kamu yakin ingin menghapus SELURUH catatan?')) {
+        localStorage.removeItem('my_app_notes');
+        cancelEdit();
+        loadNotes();
+      }
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
+ 
